@@ -699,22 +699,36 @@ function HistoryTab({ rounds, players, settings }) {
                 <div className="section-title">Scores</div>
                 {scores.map((p, i) => {
                   const pl = round.type==='single' ? players.find(x=>x.id===p.id) : null;
+                  const total = round.hands.length;
+                  const pStats = pid => ({
+                    wins:   total ? Math.round(round.hands.filter(h => h.placements?.first === pid).length / total * 100) : 0,
+                    burned: total ? Math.round(round.hands.filter(h => (h.burned||[]).includes(pid)).length / total * 100) : 0,
+                  });
                   return (
                     <div key={p.id} style={{marginBottom:6}}>
                       <div className="lb-row" style={{background:'#0d0f18',border:'1px solid #1e2235',marginBottom:0}}>
                         <div className={`lb-rank${i<3?` lb-rank-${i+1}`:''}`}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
                         {pl && <span style={{fontSize:18}}>{pl.avatar}</span>}
                         {!pl && <span>👥</span>}
-                        <span style={{flex:1,fontWeight:600,fontSize:13,color:pl?.color||'#e2e8f0'}}>{round.type==='single'?pl?.name||'?':p.name}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:600,fontSize:13,color:pl?.color||'#e2e8f0'}}>{round.type==='single'?pl?.name||'?':p.name}</div>
+                          {round.type==='single' && total > 0 && (() => { const s = pStats(p.id); return (
+                            <div style={{fontSize:10,color:'#64748b',marginTop:1}}>🥇 {s.wins}% win · 🔥 {s.burned}% burned</div>
+                          ); })()}
+                        </div>
                         <span className="lb-score">{p.score>=0?'+':''}{p.score}</span>
                       </div>
                       {round.type==='team' && (p.playerIds||[]).map(pid => {
                         const member = players.find(x => x.id === pid);
                         const ms = calcScore(settings.points, round.hands, pid);
+                        const s = pStats(pid);
                         return (
                           <div key={pid} style={{display:'flex',alignItems:'center',gap:7,padding:'4px 10px 4px 36px',background:'#0a0c14',borderLeft:'2px solid #2d3561',marginTop:1}}>
                             <span style={{fontSize:14}}>{member?.avatar||'?'}</span>
-                            <span style={{flex:1,fontSize:11,color:member?.color||'#94a3b8'}}>{member?.name||'?'}</span>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:11,color:member?.color||'#94a3b8'}}>{member?.name||'?'}</div>
+                              {total > 0 && <div style={{fontSize:10,color:'#475569'}}>🥇 {s.wins}% · 🔥 {s.burned}%</div>}
+                            </div>
                             <span style={{fontSize:11,fontWeight:600,color:ms>=0?'#a78bfa':'#ef4444'}}>{ms>=0?'+':''}{ms}</span>
                           </div>
                         );
@@ -832,30 +846,46 @@ function PlayingGroundTab({ players, rounds, setRounds, activeRoundId, setActive
         </div>
 
         <div className="section-title">Live Scores</div>
-        {scores.map((p, i) => (
-          <div key={p.id} style={{marginBottom:8}}>
-            <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:2}}>
-              <span style={{fontSize:13}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
-              <span style={{fontSize:16}}>{round.type==='team' ? '👥' : getPlayerAvatar(p.id)}</span>
-              <span style={{flex:1,fontSize:12,fontWeight:600,color:round.type==='team'?'#c4b5fd':getPlayerColor(p.id)}}>{round.type==='team' ? p.name : getPlayerName(p.id)}</span>
-              <span style={{fontWeight:700,fontSize:14,color:p.score>=0?'#a78bfa':'#ef4444'}}>{p.score>=0?'+':''}{p.score}</span>
-            </div>
-            <div className="progress-bar" style={{marginBottom: round.type==='team'?5:0}}>
-              <div className="progress-fill" style={{width:`${Math.abs(p.score)/maxAbs*100}%`,background:p.score>=0?undefined:'linear-gradient(90deg,#ef4444,#f87171)'}} />
-            </div>
-            {round.type==='team' && (p.playerIds||[]).map(pid => {
-              const pl = players.find(x => x.id === pid);
-              const ps = calcScore(settings.points, round.hands, pid);
-              return (
-                <div key={pid} style={{display:'flex',alignItems:'center',gap:6,paddingLeft:22,marginTop:3}}>
-                  <span style={{fontSize:14}}>{pl?.avatar||'?'}</span>
-                  <span style={{flex:1,fontSize:11,color:pl?.color||'#94a3b8'}}>{pl?.name||'?'}</span>
-                  <span style={{fontSize:11,fontWeight:600,color:ps>=0?'#a78bfa':'#ef4444'}}>{ps>=0?'+':''}{ps}</span>
+        {scores.map((p, i) => {
+          const total = round.hands.length;
+          const pStats = pid => ({
+            wins:   total ? Math.round(round.hands.filter(h => h.placements?.first === pid).length / total * 100) : 0,
+            burned: total ? Math.round(round.hands.filter(h => (h.burned||[]).includes(pid)).length / total * 100) : 0,
+          });
+          return (
+            <div key={p.id} style={{marginBottom:8}}>
+              <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:2}}>
+                <span style={{fontSize:13}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+                <span style={{fontSize:16}}>{round.type==='team' ? '👥' : getPlayerAvatar(p.id)}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:600,color:round.type==='team'?'#c4b5fd':getPlayerColor(p.id)}}>{round.type==='team' ? p.name : getPlayerName(p.id)}</div>
+                  {round.type==='single' && total > 0 && (() => { const s = pStats(p.id); return (
+                    <div style={{fontSize:10,color:'#64748b'}}>🥇 {s.wins}% win · 🔥 {s.burned}% burned</div>
+                  ); })()}
                 </div>
-              );
-            })}
-          </div>
-        ))}
+                <span style={{fontWeight:700,fontSize:14,color:p.score>=0?'#a78bfa':'#ef4444'}}>{p.score>=0?'+':''}{p.score}</span>
+              </div>
+              <div className="progress-bar" style={{marginBottom: round.type==='team'?5:0}}>
+                <div className="progress-fill" style={{width:`${Math.abs(p.score)/maxAbs*100}%`,background:p.score>=0?undefined:'linear-gradient(90deg,#ef4444,#f87171)'}} />
+              </div>
+              {round.type==='team' && (p.playerIds||[]).map(pid => {
+                const pl = players.find(x => x.id === pid);
+                const ps = calcScore(settings.points, round.hands, pid);
+                const s = pStats(pid);
+                return (
+                  <div key={pid} style={{display:'flex',alignItems:'center',gap:6,paddingLeft:22,marginTop:3}}>
+                    <span style={{fontSize:14}}>{pl?.avatar||'?'}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:11,color:pl?.color||'#94a3b8'}}>{pl?.name||'?'}</div>
+                      {total > 0 && <div style={{fontSize:10,color:'#475569'}}>🥇 {s.wins}% · 🔥 {s.burned}%</div>}
+                    </div>
+                    <span style={{fontSize:11,fontWeight:600,color:ps>=0?'#a78bfa':'#ef4444'}}>{ps>=0?'+':''}{ps}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
 
       <button className="btn btn-primary btn-full" style={{marginBottom:10,padding:13,fontSize:14}} onClick={() => setShowHand(true)}>
