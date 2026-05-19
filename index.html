@@ -1063,10 +1063,10 @@ function App() {
       </div>
 
       <div className="tab-content">
-        {tab === 'ground'    && <PlayingGroundTab players={players} rounds={rounds} setRounds={setRounds} activeRoundId={activeRoundId} setActiveRoundId={setActiveRoundId} settings={settings} />}
-        {tab === 'history'   && <HistoryTab rounds={rounds} players={players} settings={settings} />}
-        {tab === 'dashboard' && <DashboardTab rounds={rounds} players={players} settings={settings} />}
-        {tab === 'settings'  && <SettingsTab players={players} setPlayers={setPlayers} settings={settings} setSettings={setSettings} rounds={rounds} setRounds={setRounds} activeRoundId={activeRoundId} setActiveRoundId={setActiveRoundId} />}
+        <div style={{display: tab==='ground'    ? 'contents' : 'none'}}><PlayingGroundTab players={players} rounds={rounds} setRounds={setRounds} activeRoundId={activeRoundId} setActiveRoundId={setActiveRoundId} settings={settings} /></div>
+        <div style={{display: tab==='history'   ? 'contents' : 'none'}}><HistoryTab rounds={rounds} players={players} settings={settings} /></div>
+        <div style={{display: tab==='dashboard' ? 'contents' : 'none'}}><DashboardTab rounds={rounds} players={players} settings={settings} /></div>
+        <div style={{display: tab==='settings'  ? 'contents' : 'none'}}><SettingsTab players={players} setPlayers={setPlayers} settings={settings} setSettings={setSettings} rounds={rounds} setRounds={setRounds} activeRoundId={activeRoundId} setActiveRoundId={setActiveRoundId} /></div>
       </div>
 
       <div className="bottom-nav">
