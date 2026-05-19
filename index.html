@@ -86,6 +86,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto',sans-serif
 .badge-silver{background:#334155;color:#cbd5e1}
 .badge-bronze{background:#431407;color:#fdba74}
 .badge-4th{background:#1e3a5f;color:#93c5fd}
+.badge-jackpot{background:#78350f;color:#fcd34d}
 .badge-penalty{background:#7f1d1d;color:#fca5a5}
 .badge-bonus{background:#064e3b;color:#6ee7b7}
 
@@ -161,7 +162,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto',sans-serif
 <script type="text/babel">
 const { useState, useEffect, useMemo } = React;
 
-const DEFAULT_SETTINGS = { points: { first: 10, second: 7, third: 5, fourth: 2, penalty: -5 } };
+const DEFAULT_SETTINGS = { points: { jackpot: 20, first: 10, second: 7, third: 5, fourth: 2, penalty: -5 } };
 
 const EMOJIS = ['🦁','🐯','🐻','🦊','🐼','🦅','🐲','🎭','🃏','♟️','🎯','⚡','🔥','❄️','🌊','👑','🥷','😎','🤠','🎪','🦋','🌸','🍀','⭐','💎','🏆','🎸','🚀','🌙','🦄'];
 const COLORS = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F','#BB8FCE','#85C1E9','#FF9FF3','#54A0FF','#5F27CD','#01CBC6','#FF9F43'];
@@ -179,6 +180,7 @@ const fmtDate = ts => new Date(ts).toLocaleDateString('en-US', { month: 'short',
 const calcScore = (pts, hands, pid) => {
   let t = 0;
   for (const h of hands) {
+    if (h.placements?.jackpot === pid) t += (pts.jackpot ?? 20);
     if (h.placements?.first === pid) t += pts.first;
     if (h.placements?.second === pid) t += pts.second;
     if (h.placements?.third === pid) t += pts.third;
@@ -361,15 +363,8 @@ function NewRoundModal({ players, onSave, onClose }) {
 
 // ─── AddHandModal ─────────────────────────────────────────────
 function AddHandModal({ round, players, pts, onSave, onClose }) {
-  const [rows, setRows] = useState({
-    first:  { participantId: '', bonus: '' },
-    second: { participantId: '', bonus: '' },
-    third:  { participantId: '', bonus: '' },
-    fourth: { participantId: '', bonus: '' },
-  });
-  const [burned, setBurned] = useState([]);
+  const [assignments, setAssignments] = useState({});
 
-  // Always list individual players; for team rounds attach teamName for display
   const participants = round.type === 'single'
     ? (round.participants || []).map(p => {
         const player = players.find(pl => pl.id === p.id);
@@ -382,48 +377,25 @@ function AddHandModal({ round, players, pts, onSave, onClose }) {
         })
       );
 
-  const setRow = (slot, field, value) => setRows(prev => ({ ...prev, [slot]: { ...prev[slot], [field]: value } }));
-
-  // When a player is chosen for a placement slot, remove them from burned and other slots
-  const selectPlayer = (slot, val) => {
-    if (val) setBurned(prev => prev.filter(id => id !== val));
-    setRows(prev => {
-      const cleared = Object.fromEntries(
-        Object.entries(prev).map(([k, r]) => [k, k !== slot && r.participantId === val ? { ...r, participantId: '' } : r])
-      );
-      return { ...cleared, [slot]: { ...cleared[slot], participantId: val } };
-    });
-  };
-
-  // When a player is toggled in Burned, remove them from any placement slot
-  const toggleBurned = (pid) => {
-    const inBurned = burned.includes(pid);
-    if (!inBurned) {
-      // remove from placement slots
-      setRows(prev => Object.fromEntries(
-        Object.entries(prev).map(([k, r]) => [k, r.participantId === pid ? { ...r, participantId: '' } : r])
-      ));
-    }
-    setBurned(prev => inBurned ? prev.filter(id => id !== pid) : [...prev, pid]);
-  };
-
-  const slots = [
-    { key: 'first',  emoji: '🥇', label: '1st', pts: pts.first,  ptCol: '#f59e0b' },
-    { key: 'second', emoji: '🥈', label: '2nd', pts: pts.second, ptCol: '#94a3b8' },
-    { key: 'third',  emoji: '🥉', label: '3rd', pts: pts.third,  ptCol: '#fb923c' },
-    { key: 'fourth', emoji: '4️⃣', label: '4th', pts: pts.fourth, ptCol: '#818cf8' },
+  const POSITIONS = [
+    { key: 'jackpot', emoji: '🏆', label: 'Jackpot', pts: pts.jackpot ?? 20, color: '#fcd34d', unique: true },
+    { key: 'first',   emoji: '🥇', label: '1st',     pts: pts.first,          color: '#f59e0b', unique: true },
+    { key: 'second',  emoji: '🥈', label: '2nd',     pts: pts.second,         color: '#94a3b8', unique: true },
+    { key: 'third',   emoji: '🥉', label: '3rd',     pts: pts.third,          color: '#fb923c', unique: true },
+    { key: 'fourth',  emoji: '4️⃣', label: '4th',    pts: pts.fourth,         color: '#818cf8', unique: true },
+    { key: 'burned',  emoji: '🔥', label: 'Burned',  pts: pts.penalty,        color: '#ef4444', unique: false },
   ];
 
-  // Union of all assigned IDs (slot placements + burned), deduplicated
-  const assignedSet = new Set([
-    ...Object.values(rows).map(r => r.participantId).filter(Boolean),
-    ...burned,
-  ]);
+  // Track which unique positions are taken and by whom
+  const takenUnique = {};
+  for (const [pid, pos] of Object.entries(assignments)) {
+    if (pos && pos !== 'burned') takenUnique[pos] = pid;
+  }
 
-  const totalAssigned = assignedSet.size;
+  const setAssignment = (pid, pos) => setAssignments(prev => ({ ...prev, [pid]: pos }));
+
+  const totalAssigned = participants.filter(p => assignments[p.id]).length;
   const required = participants.length;
-
-  // Enabled when every participant has been placed somewhere
   const canSave = required > 0 && totalAssigned === required;
 
   return (
@@ -431,92 +403,48 @@ function AddHandModal({ round, players, pts, onSave, onClose }) {
       <div className="modal">
         <div className="modal-title">Hand #{round.hands.length + 1}</div>
 
-        {/* Column headers */}
-        <div className="hand-slot-grid" style={{marginBottom:6}}>
-          <div style={{fontSize:10,color:'#64748b',fontWeight:600,textTransform:'uppercase',letterSpacing:.5}}>Position</div>
-          <div style={{fontSize:10,color:'#64748b',fontWeight:600,textTransform:'uppercase',letterSpacing:.5}}>Player</div>
-          <div style={{fontSize:10,color:'#10b981',fontWeight:600,textTransform:'uppercase',letterSpacing:.5,textAlign:'center'}}>🎁 Bonus</div>
-        </div>
-
-        {slots.map(s => {
-          const row = rows[s.key];
-          return (
-            <div key={s.key} className="hand-slot-grid">
-              {/* Position label */}
-              <div className="hand-slot-label">
-                <span style={{fontSize:15,lineHeight:1}}>{s.emoji}</span>
-                <div>
-                  <div style={{fontSize:11,fontWeight:600,color:s.ptCol}}>{s.label}</div>
-                  <div style={{fontSize:9,color:'#64748b'}}>+{s.pts}pt</div>
+        <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:10}}>
+          {participants.map(p => {
+            const assigned = assignments[p.id] || '';
+            const posInfo = POSITIONS.find(x => x.key === assigned);
+            return (
+              <div key={p.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',background:'#0d0f18',borderRadius:8,border:`1px solid ${assigned ? '#2d3561' : '#1e2235'}`}}>
+                <span style={{fontSize:18}}>{p.player?.avatar || '👥'}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:'#e2e8f0',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                    {p.label}{p.teamName ? <span style={{fontSize:11,color:'#64748b'}}> ({p.teamName})</span> : ''}
+                  </div>
+                  {posInfo && (
+                    <div style={{fontSize:10,color:posInfo.color,marginTop:1}}>
+                      {posInfo.emoji} {posInfo.label} ({posInfo.pts > 0 ? '+' : ''}{posInfo.pts}pt)
+                    </div>
+                  )}
                 </div>
+                <select
+                  className="form-input"
+                  value={assigned}
+                  onChange={e => setAssignment(p.id, e.target.value)}
+                  style={{width:130,padding:'7px 8px',fontSize:12}}
+                >
+                  <option value="">— Position —</option>
+                  {POSITIONS.map(pos => {
+                    const takenByOther = pos.unique && takenUnique[pos.key] && takenUnique[pos.key] !== p.id;
+                    return (
+                      <option key={pos.key} value={pos.key} disabled={takenByOther}>
+                        {pos.emoji} {pos.label} ({pos.pts > 0 ? '+' : ''}{pos.pts}pt)
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
-
-              {/* Player dropdown */}
-              <select
-                className="form-input"
-                style={{padding:'8px 7px'}}
-                value={row.participantId}
-                onChange={e => selectPlayer(s.key, e.target.value)}
-              >
-                <option value="">— Select —</option>
-                {participants.map(p => (
-                  <option key={p.id} value={p.id}
-                    disabled={(assignedSet.has(p.id) && row.participantId !== p.id) || burned.includes(p.id)}>
-                    {p.label}{p.teamName ? ` (${p.teamName})` : ''}
-                  </option>
-                ))}
-              </select>
-
-              {/* Bonus */}
-              <input
-                type="number"
-                inputMode="numeric"
-                className="form-input hand-slot-bonus"
-                style={{border:'1px solid #064e3b',background:row.bonus?'#052e16':'#0d0f18',color:'#6ee7b7'}}
-                value={row.bonus}
-                placeholder="0"
-                onChange={e => setRow(s.key, 'bonus', e.target.value)}
-              />
-            </div>
-          );
-        })}
-
-        {/* Burned section */}
-        <div style={{background:'#110a0a',border:'1px solid #7f1d1d',borderRadius:10,padding:'10px 12px',marginTop:4,marginBottom:10}}>
-          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
-            <span style={{fontSize:15}}>🔥</span>
-            <span style={{fontSize:12,fontWeight:600,color:'#fca5a5'}}>Burned</span>
-            <span style={{fontSize:10,color:'#64748b',marginLeft:2}}>{pts.penalty}pt each · select any</span>
-          </div>
-          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-            {participants.map(p => {
-              const isBurned = burned.includes(p.id);
-              return (
-                <div key={p.id}
-                  onClick={() => toggleBurned(p.id)}
-                  style={{
-                    display:'flex',alignItems:'center',gap:5,
-                    padding:'5px 10px',borderRadius:999,cursor:'pointer',
-                    background: isBurned ? '#7f1d1d' : '#1a0a0a',
-                    border: `1px solid ${isBurned ? '#ef4444' : '#3d1515'}`,
-                    opacity: 1,
-                    transition:'all .15s'
-                  }}>
-                  <span style={{fontSize:15}}>{p.player?.avatar || '👥'}</span>
-                  <span style={{fontSize:12,fontWeight:500,color: isBurned ? '#fca5a5' : '#94a3b8'}}>
-                    {p.label}{p.teamName ? ` (${p.teamName})` : ''}
-                  </span>
-                  {isBurned && <span style={{fontSize:11,color:'#ef4444'}}>🔥</span>}
-                </div>
-              );
-            })}
-          </div>
+            );
+          })}
         </div>
 
         {/* Progress indicator */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10,padding:'6px 10px',background:'#0d0f18',borderRadius:8,border:`1px solid ${canSave?'#064e3b':'#1e2235'}`}}>
           <span style={{fontSize:11,color:'#64748b'}}>Players assigned</span>
-          <span style={{fontSize:12,fontWeight:700,color: canSave ? '#6ee7b7' : totalAssigned > required ? '#ef4444' : '#94a3b8'}}>
+          <span style={{fontSize:12,fontWeight:700,color: canSave ? '#6ee7b7' : '#94a3b8'}}>
             {totalAssigned} / {required}
           </span>
         </div>
@@ -524,23 +452,14 @@ function AddHandModal({ round, players, pts, onSave, onClose }) {
         <div style={{display:'flex',gap:8}}>
           <button className="btn btn-secondary btn-full" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary btn-full" disabled={!canSave} onClick={() => {
-            const bonuses = [];
-            for (const [, row] of Object.entries(rows)) {
-              const bon = parseInt(row.bonus) || 0;
-              if (bon && row.participantId) bonuses.push({ participantId: row.participantId, amount: bon });
+            const placements = {};
+            const burned = [];
+            for (const p of participants) {
+              const pos = assignments[p.id];
+              if (pos === 'burned') burned.push(p.id);
+              else if (pos) placements[pos] = p.id;
             }
-            onSave({
-              id: uid(),
-              placements: {
-                first:  rows.first.participantId  || null,
-                second: rows.second.participantId || null,
-                third:  rows.third.participantId  || null,
-                fourth: rows.fourth.participantId || null,
-              },
-              burned,
-              bonuses,
-              createdAt: Date.now()
-            });
+            onSave({ id: uid(), placements, burned, bonuses: [], createdAt: Date.now() });
           }}>Save Hand</button>
         </div>
       </div>
@@ -564,6 +483,7 @@ function SettingsTab({ players, setPlayers, settings, setSettings }) {
   const setPoint = (k, v) => setSettings(s => ({ ...s, points: { ...s.points, [k]: parseInt(v) || 0 } }));
 
   const pointRows = [
+    { key: 'jackpot', label: '🏆 Jackpot',   col: '#fcd34d' },
     { key: 'first',   label: '🥇 1st Place', col: '#f59e0b' },
     { key: 'second',  label: '🥈 2nd Place', col: '#94a3b8' },
     { key: 'third',   label: '🥉 3rd Place', col: '#fb923c' },
@@ -703,6 +623,7 @@ function HistoryTab({ rounds, players, settings }) {
                   <div key={h.id} className="hand-row">
                     <div className="hand-num">Hand #{hi+1}</div>
                     <div className="hand-placements">
+                      {h.placements?.jackpot && <span className="badge badge-jackpot">🏆 {getPlayerName(h.placements.jackpot)}</span>}
                       {h.placements?.first  && <span className="badge badge-gold">🥇 {getPlayerName(h.placements.first)}</span>}
                       {h.placements?.second && <span className="badge badge-silver">🥈 {getPlayerName(h.placements.second)}</span>}
                       {h.placements?.third  && <span className="badge badge-bronze">🥉 {getPlayerName(h.placements.third)}</span>}
