@@ -491,16 +491,15 @@ function AddHandModal({ round, players, pts, onSave, onClose }) {
           <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
             {participants.map(p => {
               const isBurned = burned.includes(p.id);
-              const isInSlot = assignedSet.has(p.id) && !burned.includes(p.id);
               return (
                 <div key={p.id}
-                  onClick={() => !isInSlot && toggleBurned(p.id)}
+                  onClick={() => toggleBurned(p.id)}
                   style={{
                     display:'flex',alignItems:'center',gap:5,
-                    padding:'5px 10px',borderRadius:999,cursor:isInSlot?'not-allowed':'pointer',
+                    padding:'5px 10px',borderRadius:999,cursor:'pointer',
                     background: isBurned ? '#7f1d1d' : '#1a0a0a',
                     border: `1px solid ${isBurned ? '#ef4444' : '#3d1515'}`,
-                    opacity: isInSlot ? 0.35 : 1,
+                    opacity: 1,
                     transition:'all .15s'
                   }}>
                   <span style={{fontSize:15}}>{p.player?.avatar || '👥'}</span>
