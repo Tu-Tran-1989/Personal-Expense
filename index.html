@@ -258,6 +258,7 @@ function PlayerModal({ player, onSave, onClose }) {
 // ─── NewRoundModal ────────────────────────────────────────────
 function NewRoundModal({ players, onSave, onClose }) {
   const [name, setName] = useState(`Round ${new Date().toLocaleDateString()}`);
+  const [note, setNote] = useState('');
   const [type, setType] = useState('single');
   const [selectedPlayers, setSelectedPlayers] = useState(() => players.map(p => p.id));
   const [teams, setTeams] = useState([
@@ -292,6 +293,12 @@ function NewRoundModal({ players, onSave, onClose }) {
         <div className="form-group">
           <label className="form-label">Round Name</label>
           <input className="form-input" value={name} onChange={e => setName(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Note <span style={{fontWeight:400,color:'#475569'}}>(optional)</span></label>
+          <textarea className="form-input" rows={2} value={note} onChange={e => setNote(e.target.value)}
+            placeholder="e.g. Friday night at John's place"
+            style={{resize:'none',lineHeight:1.5}} />
         </div>
         <div className="form-group">
           <label className="form-label">Type</label>
@@ -346,6 +353,7 @@ function NewRoundModal({ players, onSave, onClose }) {
             onSave({
               id: uid(),
               name: name.trim() || 'Round',
+              note: note.trim(),
               type,
               participants: type === 'single'
                 ? selectedPlayers.map(id => ({ id, type: 'player' }))
@@ -683,6 +691,7 @@ function HistoryTab({ rounds, players, settings }) {
                   <span>· {round.hands.length} hand{round.hands.length!==1?'s':''}</span>
                   <span>· {round.type==='team'?'👥 Team':'👤 Individual'}</span>
                 </div>
+                {round.note && <div style={{fontSize:11,color:'#94a3b8',marginTop:3,fontStyle:'italic'}}>📝 {round.note}</div>}
                 <div style={{marginTop:5}}>
                   {round.status === 'active'
                     ? <div className="status-live"><div className="status-dot-live" style={{width:6,height:6,borderRadius:'50%',background:'#10b981',animation:'pulse 2s infinite',display:'inline-block'}}></div> In Progress</div>
@@ -837,6 +846,7 @@ function PlayingGroundTab({ players, rounds, setRounds, activeRoundId, setActive
             <div style={{fontSize:11,color:'#64748b',marginTop:2}}>
               {round.type==='team'?'👥 Team':'👤 Individual'} · {round.hands.length} hand{round.hands.length!==1?'s':''} played
             </div>
+            {round.note && <div style={{fontSize:11,color:'#94a3b8',marginTop:3,fontStyle:'italic'}}>📝 {round.note}</div>}
             <div className="status-live" style={{marginTop:5}}>
               <div style={{width:6,height:6,borderRadius:'50%',background:'#10b981',animation:'pulse 2s infinite'}}></div>
               Live
