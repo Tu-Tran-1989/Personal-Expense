@@ -381,6 +381,8 @@ function NewRoundModal({ players, onSave, onClose }) {
 // ─── AddHandModal ─────────────────────────────────────────────
 function AddHandModal({ round, players, pts, onSave, onClose }) {
   const [assignments, setAssignments] = useState({});
+  const [bonuses, setBonuses] = useState({});
+  const setBonus = (pid, val) => setBonuses(prev => ({ ...prev, [pid]: val }));
 
   const participants = round.type === 'single'
     ? (round.participants || []).map(p => {
@@ -449,7 +451,7 @@ function AddHandModal({ round, players, pts, onSave, onClose }) {
                   className="form-input"
                   value={assigned}
                   onChange={e => setAssignment(p.id, e.target.value)}
-                  style={{width:130,padding:'7px 8px',fontSize:12}}
+                  style={{width:115,padding:'7px 8px',fontSize:12,flexShrink:0}}
                 >
                   <option value="">— Position —</option>
                   {POSITIONS.map(pos => {
@@ -461,6 +463,15 @@ function AddHandModal({ round, players, pts, onSave, onClose }) {
                     );
                   })}
                 </select>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  className="form-input"
+                  placeholder="🎁"
+                  value={bonuses[p.id] || ''}
+                  onChange={e => setBonus(p.id, e.target.value)}
+                  style={{width:54,padding:'7px 6px',fontSize:12,textAlign:'center',flexShrink:0,border:'1px solid #064e3b',background: bonuses[p.id] ? '#052e16' : '#0d0f18',color:'#6ee7b7'}}
+                />
               </div>
             );
           })}
@@ -479,12 +490,15 @@ function AddHandModal({ round, players, pts, onSave, onClose }) {
           <button className="btn btn-primary btn-full" disabled={!canSave} onClick={() => {
             const placements = {};
             const burned = [];
+            const bonusList = [];
             for (const p of participants) {
               const pos = assignments[p.id];
               if (pos === 'burned') burned.push(p.id);
               else if (pos) placements[pos] = p.id;
+              const bon = parseInt(bonuses[p.id]) || 0;
+              if (bon) bonusList.push({ participantId: p.id, amount: bon });
             }
-            onSave({ id: uid(), placements, burned, bonuses: [], createdAt: Date.now() });
+            onSave({ id: uid(), placements, burned, bonuses: bonusList, createdAt: Date.now() });
           }}>Save Hand</button>
         </div>
       </div>
