@@ -476,9 +476,65 @@ function AddHandModal({ round, players, pts, onSave, onClose }) {
 }
 
 // ─── SettingsTab ──────────────────────────────────────────────
-function SettingsTab({ players, setPlayers, settings, setSettings }) {
+function SettingsTab({ players, setPlayers, settings, setSettings, rounds, setRounds, activeRoundId, setActiveRoundId }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editP, setEditP] = useState(null);
+  const [syncToken, setSyncToken] = useState(() => store.get('cpt_sync_token', ''));
+  const [syncGist, setSyncGist]   = useState(() => store.get('cpt_sync_gist', ''));
+  const [syncStatus, setSyncStatus] = useState('');
+  const [syncing, setSyncing] = useState(false);
+
+  const saveToken = v => { setSyncToken(v); store.set('cpt_sync_token', v); };
+  const saveGist  = v => { setSyncGist(v);  store.set('cpt_sync_gist', v); };
+
+  const pushToCloud = async () => {
+    if (!syncToken) { setSyncStatus('✗ Personal Access Token required'); return; }
+    setSyncing(true); setSyncStatus('Pushing…');
+    const payload = { players, settings, rounds, activeRoundId };
+    const body = { description: 'Card Tracker Sync', files: { 'card-tracker-data.json': { content: JSON.stringify(payload) } } };
+    try {
+      let res, json;
+      if (syncGist) {
+        res = await fetch(`https://api.github.com/gists/${syncGist}`, {
+          method: 'PATCH',
+          headers: { Authorization: `token ${syncToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+      } else {
+        res = await fetch('https://api.github.com/gists', {
+          method: 'POST',
+          headers: { Authorization: `token ${syncToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...body, public: false })
+        });
+      }
+      json = await res.json();
+      if (!res.ok) throw new Error(json.message || String(res.status));
+      if (json.id && !syncGist) saveGist(json.id);
+      setSyncStatus('✓ Pushed at ' + new Date().toLocaleTimeString());
+    } catch (e) { setSyncStatus('✗ ' + e.message); }
+    setSyncing(false);
+  };
+
+  const pullFromCloud = async () => {
+    if (!syncToken || !syncGist) { setSyncStatus('✗ Token and Gist ID both required'); return; }
+    setSyncing(true); setSyncStatus('Pulling…');
+    try {
+      const res = await fetch(`https://api.github.com/gists/${syncGist}`, {
+        headers: { Authorization: `token ${syncToken}` }
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || String(res.status));
+      const content = json.files?.['card-tracker-data.json']?.content;
+      if (!content) throw new Error('No data found in gist');
+      const d = JSON.parse(content);
+      if (d.players)       setPlayers(d.players);
+      if (d.settings)      setSettings(d.settings);
+      if (d.rounds)        setRounds(d.rounds);
+      if ('activeRoundId' in d) setActiveRoundId(d.activeRoundId);
+      setSyncStatus('✓ Pulled at ' + new Date().toLocaleTimeString());
+    } catch (e) { setSyncStatus('✗ ' + e.message); }
+    setSyncing(false);
+  };
 
   const savePlayer = data => {
     if (editP) { setPlayers(p => p.map(x => x.id === editP.id ? { ...x, ...data } : x)); setEditP(null); }
@@ -536,6 +592,48 @@ function SettingsTab({ players, setPlayers, settings, setSettings }) {
             <span style={{fontSize:11,color:'#64748b',width:20}}>pts</span>
           </div>
         ))}
+      </div>
+
+      <div className="card">
+        <div className="card-title" style={{marginBottom:14}}>☁️ Cloud Sync</div>
+        <div style={{fontSize:11,color:'#64748b',marginBottom:12,lineHeight:1.6}}>
+          Sync data across devices via a private GitHub Gist. Create a token at github.com → Settings → Developer settings → Personal access tokens → with <strong style={{color:'#94a3b8'}}>gist</strong> scope.
+        </div>
+        <div style={{marginBottom:10}}>
+          <div style={{fontSize:11,color:'#94a3b8',marginBottom:4,fontWeight:600}}>Personal Access Token</div>
+          <input
+            type="password"
+            className="form-input"
+            placeholder="ghp_xxxxxxxxxxxx"
+            value={syncToken}
+            onChange={e => saveToken(e.target.value)}
+            style={{width:'100%',boxSizing:'border-box'}}
+          />
+        </div>
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:'#94a3b8',marginBottom:4,fontWeight:600}}>Gist ID <span style={{fontWeight:400,color:'#475569'}}>(auto-filled after first push)</span></div>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="e.g. a1b2c3d4e5f6..."
+            value={syncGist}
+            onChange={e => saveGist(e.target.value)}
+            style={{width:'100%',boxSizing:'border-box'}}
+          />
+        </div>
+        <div style={{display:'flex',gap:8,marginBottom:syncStatus?10:0}}>
+          <button className="btn btn-primary btn-full" disabled={syncing} onClick={pushToCloud}>
+            {syncing ? '…' : '⬆ Push'}
+          </button>
+          <button className="btn btn-secondary btn-full" disabled={syncing} onClick={pullFromCloud}>
+            {syncing ? '…' : '⬇ Pull'}
+          </button>
+        </div>
+        {syncStatus && (
+          <div style={{fontSize:11,padding:'6px 10px',borderRadius:6,background: syncStatus.startsWith('✓') ? '#052e16' : '#1a0a0a', color: syncStatus.startsWith('✓') ? '#6ee7b7' : '#fca5a5', border: `1px solid ${syncStatus.startsWith('✓') ? '#065f46' : '#7f1d1d'}`}}>
+            {syncStatus}
+          </div>
+        )}
       </div>
 
       {(showAdd || editP) && (
@@ -938,7 +1036,7 @@ function App() {
         {tab === 'ground'    && <PlayingGroundTab players={players} rounds={rounds} setRounds={setRounds} activeRoundId={activeRoundId} setActiveRoundId={setActiveRoundId} settings={settings} />}
         {tab === 'history'   && <HistoryTab rounds={rounds} players={players} settings={settings} />}
         {tab === 'dashboard' && <DashboardTab rounds={rounds} players={players} settings={settings} />}
-        {tab === 'settings'  && <SettingsTab players={players} setPlayers={setPlayers} settings={settings} setSettings={setSettings} />}
+        {tab === 'settings'  && <SettingsTab players={players} setPlayers={setPlayers} settings={settings} setSettings={setSettings} rounds={rounds} setRounds={setRounds} activeRoundId={activeRoundId} setActiveRoundId={setActiveRoundId} />}
       </div>
 
       <div className="bottom-nav">
