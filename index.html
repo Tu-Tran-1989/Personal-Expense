@@ -257,8 +257,10 @@ function PlayerModal({ player, onSave, onClose }) {
 
 // ─── NewRoundModal ────────────────────────────────────────────
 function NewRoundModal({ players, onSave, onClose }) {
+  const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
   const [name, setName] = useState(`Round ${new Date().toLocaleDateString()}`);
   const [note, setNote] = useState('');
+  const [date, setDate] = useState(todayStr);
   const [type, setType] = useState('single');
   const [selectedPlayers, setSelectedPlayers] = useState(() => players.map(p => p.id));
   const [teams, setTeams] = useState([
@@ -293,6 +295,10 @@ function NewRoundModal({ players, onSave, onClose }) {
         <div className="form-group">
           <label className="form-label">Round Name</label>
           <input className="form-input" value={name} onChange={e => setName(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Date</label>
+          <input type="date" className="form-input" value={date} onChange={e => setDate(e.target.value)} />
         </div>
         <div className="form-group">
           <label className="form-label">Note <span style={{fontWeight:400,color:'#475569'}}>(optional)</span></label>
@@ -360,7 +366,7 @@ function NewRoundModal({ players, onSave, onClose }) {
                 : teams.filter(t => t.playerIds.length > 0).map(t => ({ id: t.id, type: 'team', name: t.name, playerIds: t.playerIds })),
               hands: [],
               status: 'active',
-              createdAt: Date.now()
+              createdAt: date ? new Date(date).getTime() : Date.now()
             });
           }}>Start Round</button>
         </div>
