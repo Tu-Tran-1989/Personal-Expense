@@ -392,7 +392,15 @@ function AddHandModal({ round, players, pts, onSave, onClose }) {
     if (pos && pos !== 'burned') takenUnique[pos] = pid;
   }
 
-  const setAssignment = (pid, pos) => setAssignments(prev => ({ ...prev, [pid]: pos }));
+  const setAssignment = (pid, pos) => {
+    if (pos === 'jackpot') {
+      const auto = {};
+      for (const p of participants) auto[p.id] = p.id === pid ? 'jackpot' : 'fourth';
+      setAssignments(auto);
+    } else {
+      setAssignments(prev => ({ ...prev, [pid]: pos }));
+    }
+  };
 
   const totalAssigned = participants.filter(p => assignments[p.id]).length;
   const required = participants.length;
