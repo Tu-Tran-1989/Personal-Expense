@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Expense Tracker</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #06060a;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+
+    #root {
+      width: 100%;
+      max-width: 480px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: 16px 20px 10px;
+      padding-top: calc(16px + env(safe-area-inset-top));
+      background: #06060a;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid #18182a;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; color: #a78bfa; }
+    .header p  { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+    /* ── Content ── */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      padding-bottom: calc(80px + env(safe-area-inset-bottom));
+    }
+
+    /* ── Bottom Nav ── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 480px;
+      background: #0c0c12;
+      border-top: 1px solid #18182a;
+      display: flex;
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 100;
+    }
+    .nav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 10px 4px 8px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #4a5568;
+      font-size: 11px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-btn.active { color: #a78bfa; }
+    .nav-icon { font-size: 22px; line-height: 1; }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 18px; }
+    .form-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+      margin-bottom: 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .form-input {
+      width: 100%;
+      background: #101016;
+      border: 1px solid #1a1a26;
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: #e2e8f0;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    .form-input:focus { border-color: #a78bfa; }
+    .form-input::placeholder { color: #374151; }
+
+    /* ── Type selector ── */
+    .type-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .type-btn {
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      padding: 10px 6px 8px;
+      background: #101016;
+      border: 2px solid #1a1a26;
+      border-radius: 10px;
+      cursor: pointer;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .type-emoji { font-size: 22px; line-height: 1; }
+    .type-btn.selected {
+      border-color: var(--tc);
+      color: #e2e8f0;
+    }
+    .type-btn.selected::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--tc);
+      opacity: 0.12;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { opacity: 0.85; transform: scale(0.98); }
+    .btn-primary { background: linear-gradient(135deg, #7c3aed, #a78bfa); color: #fff; }
+
+    /* ── Expense list ── */
+    .expense-row {
+      display: flex;
+      margin-bottom: 8px;
+    }
+    .expense-item {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 12px;
+      background: #101016;
+      border: 1px solid #1a1a26;
+      border-right: none;
+      border-radius: 12px 0 0 12px;
+    }
+    .expense-icon {
+      font-size: 26px;
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a26;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+    .expense-info { flex: 1; min-width: 0; }
+    .expense-type  { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+    .expense-meta  { font-size: 11px; color: #64748b; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .expense-amount { font-size: 16px; font-weight: 700; color: #e2e8f0; white-space: nowrap; }
+    .edit-btn {
+      background: #0f1f2e;
+      border: 1px solid #1e3a52;
+      border-left: none;
+      color: #60a5fa;
+      font-size: 16px;
+      padding: 0 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+    .edit-btn:active { background: #1e3a52; }
+    .del-btn {
+      background: #1c0c0c;
+      border: 1px solid #3b1111;
+      border-left: none;
+      color: #f87171;
+      font-size: 16px;
+      padding: 0 14px;
+      border-radius: 0 12px 12px 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+    .del-btn:active { background: #3b1111; }
+
+    /* ── Edit modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 200;
+    }
+    .modal {
+      width: 100%;
+      max-width: 480px;
+      background: #0c0c12;
+      border-radius: 20px 20px 0 0;
+      padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+      animation: slideUp 0.25s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .modal-title { font-size: 17px; font-weight: 700; color: #e2e8f0; }
+    .modal-close {
+      background: #1a1a26;
+      border: none;
+      color: #94a3b8;
+      font-size: 18px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-row { display: flex; gap: 10px; }
+    .btn-row .btn { flex: 1; }
+
+    /* ── Filter chips ── */
+    .filter-date-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .filter-date-row .form-input {
+      padding: 9px 10px;
+      font-size: 13px;
+    }
+    .filter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .chip {
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid #1a1a26;
+      background: #101016;
+      color: #64748b;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chip.active { background: #2e1f5e; border-color: #a78bfa; color: #c4b5fd; }
+    .chip.clear  { border-color: #3b1111; color: #f87171; background: #1c0c0c; }
+
+    /* ── History summary bar ── */
+    .history-summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0 12px;
+      border-bottom: 1px solid #18182a;
+      margin-bottom: 8px;
+    }
+    .history-summary span { font-size: 12px; color: #64748b; }
+    .history-summary strong { font-size: 15px; font-weight: 700; color: #e2e8f0; }
+
+    /* ── Date group header ── */
+    .group-date {
+      font-size: 11px;
+      font-weight: 700;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 10px 0 6px;
+    }
+
+    /* ── Dashboard ── */
+    .summary-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .summary-card {
+      background: #101016;
+      border: 1px solid #1a1a26;
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .summary-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .summary-value { font-size: 24px; font-weight: 700; color: #e2e8f0; margin-top: 6px; line-height: 1; }
+
+    .chart-card {
+      background: #101016;
+      border: 1px solid #1a1a26;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .chart-title { font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
+    .chart-wrap  { position: relative; height: 180px; }
+
+    .type-legend { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .legend-row  { display: flex; align-items: center; gap: 8px; }
+    .legend-dot  { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+    .legend-name { flex: 1; font-size: 12px; color: #94a3b8; font-weight: 500; }
+    .legend-pct  { font-size: 11px; color: #64748b; margin-right: 6px; }
+    .legend-val  { font-size: 13px; font-weight: 700; color: #e2e8f0; }
+
+    /* ── Empty state ── */
+    .empty { text-align: center; padding: 52px 20px; color: #4a5568; }
+    .empty-icon { font-size: 52px; margin-bottom: 12px; }
+    .empty-msg  { font-size: 14px; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: calc(80px + 14px + env(safe-area-inset-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      background: #16a34a;
+      color: #fff;
+      padding: 10px 22px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 300;
+      white-space: nowrap;
+      animation: fadeUp 0.25s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo } = React;
+
+// ── Persistence ───────────────────────────────────────────────────────
+const store = {
+  get: (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+// ── Config ────────────────────────────────────────────────────────────
+const TYPES = {
+  food:     { label: 'Food',          emoji: '🍜', color: '#f59e0b' },
+  drink:    { label: 'Drink/Coffee',  emoji: '☕', color: '#8b5cf6' },
+  shopping: { label: 'Shopping',      emoji: '🛍️', color: '#ec4899' },
+  gasoline: { label: 'Gasoline',      emoji: '⛽', color: '#3b82f6' },
+  car:      { label: 'Car',           emoji: '🚗', color: '#06b6d4' },
+  other:    { label: 'Other',         emoji: '📦', color: '#6b7280' },
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────
+const fmt       = n => Number(n || 0).toLocaleString('en-US');
+const todayStr  = () => new Date().toISOString().slice(0, 10);
+const uid       = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+const addDays = (iso, n) => {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+const getMondayOf = (iso) => {
+  const d = new Date(iso + 'T00:00:00');
+  const diff = d.getDay() === 0 ? -6 : 1 - d.getDay();
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+};
+
+const weekLabel = (mon) =>
+  new Date(mon + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+const monthLabel = (y, m) =>
+  new Date(y, m, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+
+const fullDateLabel = (iso) =>
+  new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+
+// ── BottomNav ─────────────────────────────────────────────────────────
+function BottomNav({ tab, setTab }) {
+  const items = [
+    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'expense',   label: 'Add',       icon: '➕' },
+    { id: 'history',   label: 'History',   icon: '🗂️' },
+    { id: 'settings',  label: 'Settings',  icon: '⚙️' },
+  ];
+  return (
+    <div className="bottom-nav">
+      {items.map(it => (
+        <button key={it.id} className={`nav-btn ${tab === it.id ? 'active' : ''}`} onClick={() => setTab(it.id)}>
+          <span className="nav-icon">{it.icon}</span>
+          {it.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Expense Tab ───────────────────────────────────────────────────────
+function ExpenseTab({ onAdd }) {
+  const [amount, setAmount] = useState('');
+  const [type,   setType]   = useState('food');
+  const [date,   setDate]   = useState(todayStr());
+  const [note,   setNote]   = useState('');
+
+  const submit = () => {
+    const n = parseFloat(amount.replace(/,/g, ''));
+    if (!n || n <= 0) return;
+    onAdd({ id: uid(), amount: n, type, date, note: note.trim() });
+    setAmount('');
+    setNote('');
+    setDate(todayStr());
+    setType('food');
+  };
+
+  return (
+    <div>
+      <div className="form-group">
+        <label className="form-label">Amount</label>
+        <input
+          className="form-input"
+          type="number"
+          inputMode="decimal"
+          placeholder="0"
+          value={amount}
+          onChange={e => setAmount(e.target.value)}
+          style={{ fontSize: 28, fontWeight: 700, letterSpacing: 1 }}
+        />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Category</label>
+        <div className="type-grid">
+          {Object.entries(TYPES).map(([k, t]) => (
+            <button
+              key={k}
+              className={`type-btn ${type === k ? 'selected' : ''}`}
+              style={{ '--tc': t.color }}
+              onClick={() => setType(k)}
+            >
+              <span className="type-emoji">{t.emoji}</span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Date</label>
+        <input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Note</label>
+        <input
+          className="form-input"
+          type="text"
+          placeholder="Optional note..."
+          value={note}
+          onChange={e => setNote(e.target.value)}
+        />
+      </div>
+
+      <button className="btn btn-primary" onClick={submit}>Save Expense</button>
+    </div>
+  );
+}
+
+// ── Edit Modal ────────────────────────────────────────────────────────
+function EditModal({ expense, onSave, onClose }) {
+  const [amount, setAmount] = useState(String(expense.amount));
+  const [type,   setType]   = useState(expense.type);
+  const [date,   setDate]   = useState(expense.date);
+  const [note,   setNote]   = useState(expense.note);
+
+  const save = () => {
+    const n = parseFloat(amount.replace(/,/g, ''));
+    if (!n || n <= 0) return;
+    onSave({ ...expense, amount: n, type, date, note: note.trim() });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <span className="modal-title">Edit Expense</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Amount</label>
+          <input
+            className="form-input"
+            type="number"
+            inputMode="decimal"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            style={{ fontSize: 24, fontWeight: 700 }}
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Category</label>
+          <div className="type-grid">
+            {Object.entries(TYPES).map(([k, t]) => (
+              <button
+                key={k}
+                className={`type-btn ${type === k ? 'selected' : ''}`}
+                style={{ '--tc': t.color }}
+                onClick={() => setType(k)}
+              >
+                <span className="type-emoji">{t.emoji}</span>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Date</label>
+          <input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Note</label>
+          <input
+            className="form-input"
+            type="text"
+            placeholder="Optional note..."
+            value={note}
+            onChange={e => setNote(e.target.value)}
+          />
+        </div>
+
+        <div className="btn-row">
+          <button className="btn" style={{ background: '#101016', border: '1px solid #1a1a26', color: '#94a3b8' }} onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={save}>Save Changes</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── History Tab ───────────────────────────────────────────────────────
+function HistoryTab({ expenses, onDelete, onEdit }) {
+  const [from,       setFrom]       = useState('');
+  const [to,         setTo]         = useState('');
+  const [typeFilter, setTypeFilter] = useState([]);
+  const [editing,    setEditing]    = useState(null);
+
+  const toggleType = t =>
+    setTypeFilter(p => p.includes(t) ? p.filter(x => x !== t) : [...p, t]);
+
+  const hasFilter = from || to || typeFilter.length;
+
+  const clearFilters = () => { setFrom(''); setTo(''); setTypeFilter([]); };
+
+  const filtered = useMemo(() =>
+    expenses
+      .filter(e => {
+        if (from && e.date < from) return false;
+        if (to   && e.date > to)   return false;
+        if (typeFilter.length && !typeFilter.includes(e.type)) return false;
+        return true;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)),
+    [expenses, from, to, typeFilter]
+  );
+
+  const groups = useMemo(() => {
+    const map = {};
+    filtered.forEach(e => { (map[e.date] = map[e.date] || []).push(e); });
+    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [filtered]);
+
+  const total = filtered.reduce((s, e) => s + e.amount, 0);
+
+  return (
+    <div>
+      <div className="filter-date-row">
+        <input className="form-input" type="date" value={from} onChange={e => setFrom(e.target.value)} />
+        <input className="form-input" type="date" value={to}   onChange={e => setTo(e.target.value)}   />
+      </div>
+
+      <div className="filter-chips">
+        {Object.entries(TYPES).map(([k, t]) => (
+          <button key={k} className={`chip ${typeFilter.includes(k) ? 'active' : ''}`} onClick={() => toggleType(k)}>
+            {t.emoji} {t.label}
+          </button>
+        ))}
+        {hasFilter && (
+          <button className="chip clear" onClick={clearFilters}>✕ Clear</button>
+        )}
+      </div>
+
+      {filtered.length > 0 && (
+        <div className="history-summary">
+          <span>{filtered.length} item{filtered.length !== 1 ? 's' : ''}</span>
+          <strong>{fmt(total)}</strong>
+        </div>
+      )}
+
+      {editing && (
+        <EditModal
+          expense={editing}
+          onSave={e => { onEdit(e); setEditing(null); }}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
+      {groups.length === 0 ? (
+        <div className="empty">
+          <div className="empty-icon">🗒️</div>
+          <div className="empty-msg">No expenses found</div>
+        </div>
+      ) : groups.map(([date, items]) => (
+        <div key={date}>
+          <div className="group-date">{fullDateLabel(date)}</div>
+          {items.map(e => {
+            const t = TYPES[e.type] || TYPES.other;
+            return (
+              <div key={e.id} className="expense-row">
+                <div className="expense-item">
+                  <div className="expense-icon">{t.emoji}</div>
+                  <div className="expense-info">
+                    <div className="expense-type">{t.label}</div>
+                    {e.note && <div className="expense-meta">{e.note}</div>}
+                  </div>
+                  <div className="expense-amount">{fmt(e.amount)}</div>
+                </div>
+                <button className="edit-btn" onClick={() => setEditing(e)}>✏️</button>
+                <button className="del-btn" onClick={() => onDelete(e.id)}>🗑</button>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Category Donut ────────────────────────────────────────────────────
+function CategoryDonut({ expenses, title }) {
+  const canvasRef = useRef(null);
+
+  const typeData = useMemo(() => {
+    const map = {};
+    expenses.forEach(e => { map[e.type] = (map[e.type] || 0) + e.amount; });
+    const totalAll = Object.values(map).reduce((s, v) => s + v, 0);
+    return Object.entries(TYPES)
+      .map(([k, t]) => ({ ...t, key: k, total: map[k] || 0, pct: totalAll ? Math.round((map[k] || 0) / totalAll * 100) : 0 }))
+      .filter(d => d.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [expenses]);
+
+  useEffect(() => {
+    if (!canvasRef.current || typeData.length === 0) return;
+    const chart = new Chart(canvasRef.current, {
+      type: 'doughnut',
+      data: {
+        labels: typeData.map(d => d.label),
+        datasets: [{ data: typeData.map(d => d.total), backgroundColor: typeData.map(d => d.color), borderWidth: 2, borderColor: '#101016', hoverOffset: 4 }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '68%',
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + fmt(ctx.parsed) } } }
+      }
+    });
+    return () => chart.destroy();
+  }, [JSON.stringify(typeData)]);
+
+  return (
+    <div className="chart-card">
+      <div className="chart-title">{title}</div>
+      {typeData.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '16px 0', color: '#4a5568', fontSize: 13 }}>No expenses</div>
+      ) : (
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <div style={{ width: 130, height: 130, flexShrink: 0 }}>
+            <canvas ref={canvasRef}></canvas>
+          </div>
+          <div className="type-legend" style={{ flex: 1 }}>
+            {typeData.map(d => (
+              <div key={d.key} className="legend-row">
+                <div className="legend-dot" style={{ background: d.color }}></div>
+                <span className="legend-name">{d.emoji} {d.label}</span>
+                <span className="legend-pct">{d.pct}%</span>
+                <span className="legend-val">{fmt(d.total)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Dashboard Tab ─────────────────────────────────────────────────────
+function DashboardTab({ expenses }) {
+  const weekRef  = useRef(null);
+  const monthRef = useRef(null);
+
+  const today    = useMemo(() => todayStr(), []);
+  const monday   = useMemo(() => getMondayOf(today), [today]);
+  const monthPfx = today.slice(0, 7);
+
+  const weekExpenses  = useMemo(() => expenses.filter(e => e.date >= monday && e.date <= addDays(monday, 6)), [expenses, monday]);
+  const monthExpenses = useMemo(() => expenses.filter(e => e.date.startsWith(monthPfx)), [expenses, monthPfx]);
+
+  const weekTotal  = useMemo(() => weekExpenses.reduce((s, e)  => s + e.amount, 0), [weekExpenses]);
+  const monthTotal = useMemo(() => monthExpenses.reduce((s, e) => s + e.amount, 0), [monthExpenses]);
+
+  // Last 6 weeks
+  const weeklyData = useMemo(() => {
+    const weeks = [];
+    let mon = monday;
+    for (let i = 0; i < 6; i++) { weeks.unshift(mon); mon = addDays(mon, -7); }
+    return weeks.map(mon => {
+      const end   = addDays(mon, 6);
+      const total = expenses.filter(e => e.date >= mon && e.date <= end).reduce((s, e) => s + e.amount, 0);
+      return { label: weekLabel(mon), total, current: mon === monday };
+    });
+  }, [expenses, monday]);
+
+  // Last 6 months
+  const monthlyData = useMemo(() => {
+    const now = new Date(today + 'T00:00:00');
+    return Array.from({ length: 6 }, (_, i) => {
+      const d   = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const pfx = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const total = expenses.filter(e => e.date.startsWith(pfx)).reduce((s, e) => s + e.amount, 0);
+      return { label: monthLabel(d.getFullYear(), d.getMonth()), total, current: pfx === monthPfx };
+    });
+  }, [expenses, today, monthPfx]);
+
+  const barOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + fmt(ctx.parsed.y) } } },
+    scales: {
+      x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#18182a', drawBorder: false } },
+      y: { ticks: { color: '#64748b', font: { size: 10 }, callback: v => fmt(v) }, grid: { color: '#18182a', drawBorder: false }, beginAtZero: true }
+    }
+  };
+
+  useEffect(() => {
+    if (!weekRef.current) return;
+    const chart = new Chart(weekRef.current, {
+      type: 'bar',
+      data: {
+        labels: weeklyData.map(d => d.label),
+        datasets: [{ data: weeklyData.map(d => d.total), backgroundColor: weeklyData.map(d => d.current ? '#a78bfa' : '#3730a3'), borderRadius: 6, borderSkipped: false }]
+      },
+      options: barOptions
+    });
+    return () => chart.destroy();
+  }, [JSON.stringify(weeklyData)]);
+
+  useEffect(() => {
+    if (!monthRef.current) return;
+    const chart = new Chart(monthRef.current, {
+      type: 'bar',
+      data: {
+        labels: monthlyData.map(d => d.label),
+        datasets: [{ data: monthlyData.map(d => d.total), backgroundColor: monthlyData.map(d => d.current ? '#a78bfa' : '#3730a3'), borderRadius: 6, borderSkipped: false }]
+      },
+      options: barOptions
+    });
+    return () => chart.destroy();
+  }, [JSON.stringify(monthlyData)]);
+
+  return (
+    <div>
+      <div className="summary-row">
+        <div className="summary-card">
+          <div className="summary-label">This Week</div>
+          <div className="summary-value">{fmt(weekTotal)}</div>
+        </div>
+        <div className="summary-card">
+          <div className="summary-label">This Month</div>
+          <div className="summary-value">{fmt(monthTotal)}</div>
+        </div>
+      </div>
+
+      {expenses.length === 0 ? (
+        <div className="empty">
+          <div className="empty-icon">📊</div>
+          <div className="empty-msg">Add expenses to see your charts</div>
+        </div>
+      ) : (
+        <>
+          <div className="chart-card">
+            <div className="chart-title">Weekly Spending — last 6 weeks</div>
+            <div className="chart-wrap"><canvas ref={weekRef}></canvas></div>
+          </div>
+
+          <div className="chart-card">
+            <div className="chart-title">Monthly Spending — last 6 months</div>
+            <div className="chart-wrap"><canvas ref={monthRef}></canvas></div>
+          </div>
+
+          <CategoryDonut expenses={weekExpenses}  title="By Category — This Week"  />
+          <CategoryDonut expenses={monthExpenses} title="By Category — This Month" />
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Settings Tab ─────────────────────────────────────────────────────
+function SettingsTab({ expenses, onPull }) {
+  const [token,     setToken]     = useState(() => store.get('exp_sync_token', ''));
+  const [gistId,    setGistId]    = useState(() => store.get('exp_sync_gist', ''));
+  const [showToken, setShowToken] = useState(false);
+  const [status,    setStatus]    = useState(null);
+  const [loading,   setLoading]   = useState(null);
+
+  const flash = (type, msg) => { setStatus({ type, msg }); setTimeout(() => setStatus(null), 3000); };
+
+  const saveConfig = () => {
+    store.set('exp_sync_token', token.trim());
+    store.set('exp_sync_gist', gistId.trim());
+    flash('success', 'Settings saved');
+  };
+
+  const push = async () => {
+    if (!token || !gistId) { flash('error', 'Token and Gist ID are required'); return; }
+    setLoading('push');
+    try {
+      const res = await fetch(`https://api.github.com/gists/${gistId.trim()}`, {
+        method: 'PATCH',
+        headers: { Authorization: `token ${token.trim()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files: { 'expenses.json': { content: JSON.stringify(expenses, null, 2) } } })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      flash('success', `Pushed ${expenses.length} expenses ✓`);
+    } catch (e) {
+      flash('error', `Push failed: ${e.message}`);
+    }
+    setLoading(null);
+  };
+
+  const pull = async () => {
+    if (!token || !gistId) { flash('error', 'Token and Gist ID are required'); return; }
+    setLoading('pull');
+    try {
+      const res = await fetch(`https://api.github.com/gists/${gistId.trim()}`, {
+        headers: { Authorization: `token ${token.trim()}` }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const file = data.files['expenses.json'];
+      if (!file) throw new Error('expenses.json not found in Gist');
+      const pulled = JSON.parse(file.content);
+      onPull(pulled);
+      flash('success', `Pulled ${pulled.length} expenses ✓`);
+    } catch (e) {
+      flash('error', `Pull failed: ${e.message}`);
+    }
+    setLoading(null);
+  };
+
+  return (
+    <div>
+      <div className="form-group">
+        <label className="form-label">GitHub Personal Access Token</label>
+        <div style={{ position: 'relative' }}>
+          <input
+            className="form-input"
+            type={showToken ? 'text' : 'password'}
+            placeholder="ghp_xxxxxxxxxxxx"
+            value={token}
+            onChange={e => setToken(e.target.value)}
+            style={{ paddingRight: 48 }}
+          />
+          <button
+            onClick={() => setShowToken(p => !p)}
+            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#64748b' }}
+          >{showToken ? '🙈' : '👁️'}</button>
+        </div>
+        <div style={{ fontSize: 11, color: '#4a5568', marginTop: 6 }}>Requires <code style={{ color: '#a78bfa' }}>gist</code> scope</div>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Gist ID</label>
+        <input
+          className="form-input"
+          type="text"
+          placeholder="e.g. a1b2c3d4e5f6..."
+          value={gistId}
+          onChange={e => setGistId(e.target.value)}
+        />
+        <div style={{ fontSize: 11, color: '#4a5568', marginTop: 6 }}>Found in the Gist URL: gist.github.com/user/<span style={{ color: '#a78bfa' }}>ID</span></div>
+      </div>
+
+      <button className="btn btn-primary" onClick={saveConfig} style={{ marginBottom: 24 }}>Save Settings</button>
+
+      <div style={{ borderTop: '1px solid #18182a', paddingTop: 20, marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 }}>Cloud Sync</div>
+        <div className="btn-row">
+          <button
+            className="btn"
+            style={{ background: '#0f2d1f', border: '1px solid #166534', color: '#4ade80', opacity: loading ? 0.6 : 1 }}
+            onClick={push}
+            disabled={!!loading}
+          >
+            {loading === 'push' ? '⏳ Pushing…' : '☁️ Push to Gist'}
+          </button>
+          <button
+            className="btn"
+            style={{ background: '#0f1f2e', border: '1px solid #1e3a5f', color: '#60a5fa', opacity: loading ? 0.6 : 1 }}
+            onClick={pull}
+            disabled={!!loading}
+          >
+            {loading === 'pull' ? '⏳ Pulling…' : '📥 Pull from Gist'}
+          </button>
+        </div>
+      </div>
+
+      {status && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: 10,
+          fontSize: 13,
+          fontWeight: 600,
+          background: status.type === 'success' ? '#0f2d1f' : '#2d0f0f',
+          border: `1px solid ${status.type === 'success' ? '#166534' : '#7f1d1d'}`,
+          color: status.type === 'success' ? '#4ade80' : '#f87171',
+        }}>
+          {status.msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────────────────
+function App() {
+  const [tab,      setTab]      = useState('expense');
+  const [expenses, setExpenses] = useState(() => store.get('exp_expenses', []));
+  const [toast,    setToast]    = useState(null);
+
+  useEffect(() => { store.set('exp_expenses', expenses); }, [expenses]);
+
+  const showToast = msg => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2000);
+  };
+
+  const handleAdd = expense => {
+    setExpenses(p => [...p, expense]);
+    showToast('Expense saved!');
+    setTab('history');
+  };
+
+  const handleDelete = id => {
+    if (!window.confirm('Delete this expense?')) return;
+    setExpenses(p => p.filter(e => e.id !== id));
+  };
+
+  const handleEdit = updated =>
+    setExpenses(p => p.map(e => e.id === updated.id ? updated : e));
+
+  const handlePull = pulled => setExpenses(pulled);
+
+  const PAGE_TITLE = { dashboard: 'Overview', expense: 'New Expense', history: 'History', settings: 'Settings' };
+
+  return (
+    <>
+      <div className="header">
+        <h1>💸 Expense Tracker</h1>
+        <p>{PAGE_TITLE[tab]}</p>
+      </div>
+
+      <div className="content">
+        {tab === 'expense'   && <ExpenseTab  onAdd={handleAdd} />}
+        {tab === 'history'   && <HistoryTab  expenses={expenses} onDelete={handleDelete} onEdit={handleEdit} />}
+        {tab === 'dashboard' && <DashboardTab expenses={expenses} />}
+        {tab === 'settings'  && <SettingsTab  expenses={expenses} onPull={handlePull} />}
+      </div>
+
+      <BottomNav tab={tab} setTab={setTab} />
+      {toast && <div className="toast">{toast}</div>}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
